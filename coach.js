@@ -17,10 +17,12 @@ const session = new Session();
 const controls = document.getElementById("controls");
 const prefsForm = document.getElementById("prefs");
 const welcome = document.getElementById("welcome");
+const updateButton = document.getElementById("update");
 const prefs = { onTop: true, autoLive: true, welcomed: false, ...JSON.parse(localStorage.getItem(PREFS) ?? "{}") };
 let problem = ""; // why the game can't be read, if main.js reported one
 let live = false; // a game is being shown in the Live view
 let remembered = ""; // the last-game summary already saved
+let update = null; // a downloaded update waiting for a restart, from main.js
 
 const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const span = (text, cls = "") => (cls ? `<span class="${cls}">${esc(text)}</span>` : esc(text));
@@ -82,6 +84,15 @@ function renderHome() {
     : span("The meta couldn't be downloaded and there is no saved copy. Check your connection, then reopen the app.", "warn"));
   fill("home-meta", meta ? esc(`Set ${meta.set}  ·  ${meta.platform.toUpperCase()} Challenger  ·  ${meta.matches} matches, ` +
                                `${meta.comps.length} comps  ·  built ${meta.built} UTC`) : "");
+}
+
+/** The restart button for a downloaded update. Not offered during a game: restarting would lose it. */
+function renderUpdate() {
+  updateButton.hidden = !update;
+  if (!update) return;
+  updateButton.textContent = update.version ? `Restart to update to ${update.version}` : "Restart to update the game events";
+  updateButton.disabled = live;
+  updateButton.title = live ? "Available once your game is over. The update also installs when you close TFT Coach." : "";
 }
 
 function renderComps() {
@@ -174,6 +185,7 @@ function render() {
   renderLive();
   remember();
   renderHome();
+  renderUpdate();
 }
 
 function resetControls() {
@@ -197,6 +209,11 @@ window.game.onProblem((text) => {
   problem = text;
   render();
 });
+window.game.onUpdate((found) => {
+  update = found;
+  renderUpdate();
+});
+updateButton.addEventListener("click", () => window.game.restart());
 controls.addEventListener("change", render);
 
 document.getElementById("nav").addEventListener("click", (event) => {
@@ -209,6 +226,13 @@ prefsForm.addEventListener("change", () => {
   window.game.setOnTop(prefs.onTop);
 });
 document.getElementById("show-welcome").addEventListener("click", () => welcome.showModal());
+document.getElementById("manage-privacy").addEventListener("click", () => window.game.privacySettings());
+document.getElementById("manage-consent").addEventListener("click", () => window.game.privacySettings("purposes"));
+document.getElementById("vendors").addEventListener("click", (event) => {
+  event.preventDefault();
+  window.game.privacySettings("vendors");
+});
+for (const link of document.querySelectorAll("[data-link]")) link.addEventListener("click", () => window.game.open(link.dataset.link));
 welcome.addEventListener("close", () => {
   prefs.welcomed = true;
   savePrefs();
@@ -224,5 +248,7 @@ fill("about", esc(`TFT Coach ${await window.game.version()}\n\n` +
 renderComps();
 render();
 window.game.setOnTop(prefs.onTop);
+// Where the law asks for consent, the welcome guide also explains what Overwolf stores and how to choose.
+document.getElementById("consent").hidden = !(await window.game.consentNeeded());
 if (!prefs.welcomed) welcome.showModal();
 window.game.ready();

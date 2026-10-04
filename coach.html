@@ -13,6 +13,7 @@
     <button data-view="live">Live game</button>
     <button data-view="settings">Settings</button>
     <span id="connection"></span>
+    <button id="update" hidden></button>
   </nav>
 
   <main id="home" class="view">
@@ -61,6 +62,11 @@
       </form>
     </section>
     <section class="wide">
+      <h2>Privacy</h2>
+      <div>TFT Coach reads your game on this computer only: it has no account and no server of its own. Overwolf, the platform it runs on, collects anonymous usage statistics.</div>
+      <button id="manage-privacy">Manage privacy settings</button> <button data-link="privacy">Privacy policy</button> <button data-link="terms">Terms of use</button>
+    </section>
+    <section class="wide">
       <h2>Help</h2>
       <button id="show-welcome">Show the welcome guide again</button>
     </section>
@@ -80,6 +86,10 @@
       <li><b>Home</b>: a summary of your last game.</li>
     </ul>
     <p>Put this window on a second monitor, or switch to it between rounds.</p>
+    <p id="consent" hidden>TFT Coach runs on Overwolf. Overwolf and its <a href="#" id="vendors">ad vendors</a> may store
+      and read information on this device, such as a device identifier, to measure usage and to choose ads. TFT Coach
+      shows no ads today. You can choose what you allow now, or later from Settings.
+      <button type="button" id="manage-consent">Manage</button></p>
     <form method="dialog"><button>Got it</button></form>
   </dialog>
 

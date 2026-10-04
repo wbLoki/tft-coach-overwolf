@@ -1,18 +1,29 @@
 /** Main process: opens the app window and forwards Overwolf's TFT game events to it. */
-import { app, BrowserWindow, ipcMain, screen } from "electron";
+import { app, BrowserWindow, ipcMain, screen, shell } from "electron";
+import updater from "electron-updater";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+const { autoUpdater } = updater;
 
 // Augment data is left out on purpose: Riot doesn't allow third-party apps to show it.
 const FEATURES = ["me", "match_info", "store", "board", "bench"];
 // kGepSupportedGameIds lists TFT on its own id; League of Legends, which TFT runs in, is accepted too.
 const GAME_IDS = [21570, 5426];
+const UPDATE_CHECK_MS = 4 * 60 * 60 * 1000;
+// Pages the window may open in the browser.
+const LINKS = {
+  privacy: "https://github.com/wbLoki/tft-coach-overwolf/blob/main/PRIVACY.md",
+  terms: "https://github.com/wbLoki/tft-coach-overwolf/blob/main/TERMS.md",
+};
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let window = null;
 let listening = false; // the window has loaded its data and asked for the game state
 let gep = null;
 let activeGame = null;
+let update = null; // what a restart would install: {version} for a new TFT Coach, {} for Overwolf's packages alone
 
 function send(channel, payload) {
   if (listening && window) window.webContents.send(channel, payload);
@@ -69,9 +80,46 @@ function watchGames() {
   gep.on("error", (event, gameId, error) => console.error("game events error:", gameId, error));
 }
 
+function offerUpdate(found) {
+  update = found;
+  send("update", update);
+}
+
+/**
+ * Downloads new versions in the background; they install on restart, or when the app is closed.
+ * The feed is "publish" under "build" in package.json: without it the build has no app-update.yml and nothing is checked.
+ */
+function watchUpdates() {
+  if (!app.isPackaged || !fs.existsSync(path.join(process.resourcesPath, "app-update.yml"))) return;
+  autoUpdater.on("update-downloaded", (info) => offerUpdate({ version: info.version }));
+  autoUpdater.on("error", (error) => console.error("update failed:", error));
+  const check = () => autoUpdater.checkForUpdates().catch(() => {}); // reported by the "error" event
+  check();
+  setInterval(check, UPDATE_CHECK_MS);
+}
+
 ipcMain.on("ready", () => {
   listening = true;
+  if (update) send("update", update);
   sendState();
+});
+ipcMain.on("restart", () => {
+  if (update?.version) {
+    autoUpdater.quitAndInstall();
+  } else {
+    app.relaunch();
+    app.quit();
+  }
+});
+ipcMain.handle("consent-needed", () => app.overwolf.isCMPRequired());
+// With a tab: the consent window on that tab, for users who are asked for consent. Without: the ad privacy settings.
+ipcMain.on("privacy-settings", (event, tab) => {
+  const options = { parent: window ?? undefined };
+  (tab ? app.overwolf.openCMPWindow({ ...options, tab }) : app.overwolf.openAdPrivacySettingsWindow(options))
+    .catch((error) => console.error("privacy settings:", error));
+});
+ipcMain.on("open", (event, name) => {
+  if (LINKS[name]) shell.openExternal(LINKS[name]);
 });
 ipcMain.on("on-top", (event, flag) => window?.setAlwaysOnTop(flag));
 ipcMain.handle("version", () => app.getVersion());
@@ -84,5 +132,11 @@ app.overwolf.packages.on("failed-to-initialize", (event, name) => {
   if (name === "gep") send("problem", "Overwolf's game events couldn't start, so the game can't be read.");
 });
 
-app.whenReady().then(createWindow);
+// A newer gep was downloaded (after a TFT patch, for example): it loads the next time the app starts.
+app.overwolf.packages.on("package-update-pending", () => offerUpdate(update ?? {}));
+
+app.whenReady().then(() => {
+  createWindow();
+  watchUpdates();
+});
 app.on("window-all-closed", () => app.quit());

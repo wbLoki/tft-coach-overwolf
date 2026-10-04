@@ -16,7 +16,7 @@
   },
   "scripts": {
     "start": "ow-electron .",
-    "build": "ow-electron-builder --publish=never",
+    "build": "node scripts/installer-terms.js && ow-electron-builder --publish=never",
     "test": "node --test"
   },
   "build": {
@@ -33,11 +33,17 @@
     "win": {
       "target": "nsis",
       "icon": "icons/launcher.ico"
+    },
+    "nsis": {
+      "license": "build/terms.txt"
     }
   },
   "devDependencies": {
     "@overwolf/ow-electron": "^42.11.4",
     "@overwolf/ow-electron-builder": "^26.9.3",
     "@overwolf/ow-electron-packages-types": "^1.1.12"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }
