@@ -52,6 +52,27 @@ The window opens without any setup, but **the game events only load for approved
   console. Without them the app runs and stays on "Waiting for a TFT game".
 - A distributed build must be code-signed (`OW_BUILD_KEY` at build time), or the game events don't load.
 
+## Updates
+
+- **The app.** `electron-updater` downloads new versions in the background and offers a restart in the top
+  bar, except during a game; the update also installs when the app is closed. It needs a feed: add
+  `"publish": { "provider": "generic", "url": "<feed URL>" }` under `build` in `package.json`, with the URL
+  Overwolf gives for your app ID in
+  [Setting up Electron auto updates](https://dev.overwolf.com/ow-electron/developers-console/releases-management/release-management/#setting-up-electron-auto-updates),
+  or your own CDN. Without it the build has no `app-update.yml` and the app doesn't check.
+- **Overwolf's game-events package.** Overwolf downloads new versions by itself; the app offers the same
+  restart when one is waiting.
+
+## Privacy
+
+- **Settings > Privacy** opens Overwolf's privacy window and links to [PRIVACY.md](PRIVACY.md) and
+  [TERMS.md](TERMS.md). The links are in `LINKS` in `main.js`: Overwolf needs them to be public pages.
+- The installer shows the terms, which point to the privacy policy, and asks the user to agree before
+  installing. Updates skip the page. The text is `build/terms.txt`, which `npm run build` writes from
+  `TERMS.md` (`scripts/installer-terms.js`).
+- Where consent is required (`app.overwolf.isCMPRequired()`), the welcome guide adds a consent notice with
+  a Manage button.
+
 ## Not checked in a real game yet
 
 The game-event handling is written from Overwolf's documentation and type definitions:

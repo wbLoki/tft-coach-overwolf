@@ -38,6 +38,8 @@ button:hover { background: var(--raised); }
 #nav button { color: var(--muted); }
 #nav button.active { background: var(--raised); color: var(--fg); }
 #connection { margin-left: auto; color: var(--muted); font-size: 9pt; }
+#nav #update { color: var(--good); }
+#nav #update:disabled { color: var(--muted); cursor: default; }
 
 .view {
   flex: 1;
@@ -74,6 +76,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
 dialog h1 { margin: 0 0 8px; font-size: 14pt; }
 dialog li { margin-bottom: 6px; }
 dialog button { background: var(--raised); }
+dialog a { color: var(--info); }
 
 .bold { font-weight: 600; }
 .muted { color: var(--muted); }
