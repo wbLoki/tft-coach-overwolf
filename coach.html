@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://raw.githubusercontent.com; img-src https://raw.communitydragon.org">
+  <title>TFT Coach</title>
+  <link rel="stylesheet" href="coach.css">
+</head>
+<body>
+  <nav id="nav">
+    <button data-view="home" class="active">Home</button>
+    <button data-view="comps">Meta comps</button>
+    <button data-view="live">Live game</button>
+    <button data-view="settings">Settings</button>
+    <span id="connection"></span>
+  </nav>
+
+  <main id="home" class="view">
+    <section class="wide"><h2>Game</h2><div id="home-game"></div></section>
+    <section class="wide"><h2>Your last game</h2><div id="home-last"></div></section>
+    <section class="wide"><h2>Top comps right now</h2><div id="home-comps"></div></section>
+    <section class="wide small"><h2>Meta data</h2><div id="home-meta"></div></section>
+  </main>
+
+  <main id="comps" class="view" hidden>
+    <section class="wide"><h2>Meta comps, best average placement first</h2><div id="comps-list"></div></section>
+  </main>
+
+  <main id="live" class="view" hidden>
+    <form id="controls" class="wide">
+      <label><input type="checkbox" name="lock"> keep following this comp</label>
+      <!-- Extra board slots beyond your level: Tactician's Cape / Crown, or augments that add team size. -->
+      <label class="right">extra board slots
+        <select name="extraSlots">
+          <option value="0">none</option>
+          <option value="1">+1 (Tactician's Cape / Crown)</option>
+          <option value="2">+2</option>
+          <option value="3">+3</option>
+        </select>
+      </label>
+    </form>
+    <div id="status" class="wide">Starting...</div>
+    <div id="note" class="wide"></div>
+    <section class="wide"><h2>Your economy</h2><div id="econ"></div></section>
+    <section class="wide"><h2>Your board</h2><div id="board" class="board"></div></section>
+    <section class="wide"><h2>Your bench</h2><div id="bench" class="strip"></div></section>
+    <section><h2>Your shop</h2><div id="own-shop" class="strip"></div></section>
+    <section><h2>Your items</h2><div id="own-items" class="strip"></div></section>
+    <section class="wide"><h2>Closest meta comp</h2><div id="plan"></div></section>
+    <section><h2>Its units in your shop</h2><div id="shop"></div></section>
+    <section><h2>Its usual items</h2><div id="items"></div></section>
+    <section class="wide small"><h2>Comps matching your board</h2><div id="matches"></div></section>
+  </main>
+
+  <main id="settings" class="view" hidden>
+    <section class="wide">
+      <h2>Window</h2>
+      <form id="prefs">
+        <label><input type="checkbox" name="onTop"> Keep the window on top of other windows</label>
+        <label><input type="checkbox" name="autoLive"> Open the Live game view when a match starts</label>
+      </form>
+    </section>
+    <section class="wide">
+      <h2>Help</h2>
+      <button id="show-welcome">Show the welcome guide again</button>
+    </section>
+    <section class="wide small">
+      <h2>About</h2>
+      <div id="about"></div>
+    </section>
+  </main>
+
+  <dialog id="welcome">
+    <h1>Welcome to TFT Coach</h1>
+    <p>A companion for Teamfight Tactics that helps you read your economy and the meta.</p>
+    <ul>
+      <li><b>Meta comps</b>: the comps doing best in recent high-rank games, with their units and items.</li>
+      <li><b>Live game</b>: start a match and this view fills in with your gold, level and interest numbers,
+        the meta comp closest to your board, and the comps your opponents play.</li>
+      <li><b>Home</b>: a summary of your last game.</li>
+    </ul>
+    <p>Put this window on a second monitor, or switch to it between rounds.</p>
+    <form method="dialog"><button>Got it</button></form>
+  </dialog>
+
+  <script type="module" src="coach.js"></script>
+</body>
+</html>
