@@ -11,7 +11,8 @@
   "main": "main.js",
   "overwolf": {
     "packages": [
-      "gep"
+      "gep",
+      "overlay"
     ]
   },
   "scripts": {

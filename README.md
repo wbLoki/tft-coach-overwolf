@@ -17,7 +17,11 @@ and shows your economy and the meta next to the game.
     level, and shop odds.
   - The meta comp closest to your board, where its units are, its usual items, and the comps your
     opponents play.
-- **Settings**: window options, the welcome guide, and about.
+- **In-game overlay**: a compact Live game view drawn inside the game during a match, for players with one
+  monitor: your economy, the closest meta comp, its units in your shop and its usual items. Drag it by its
+  top line, and it stays where you left it; Ctrl+Shift+T shows and hides it, or the hotkey you choose in
+  Settings, which can also turn the overlay off.
+- **Settings**: window options, the overlay, privacy, the welcome guide, and about.
 
 ## Rules it follows
 
@@ -82,13 +86,16 @@ The game-event handling is written from Overwolf's documentation and type defini
 - **Which game ID fires for a TFT match.** The types list TFT (21570) and League of Legends (5426), so
   `main.js` accepts both.
 - **Event timing.** Whether an opponent's name arrives before their board, and when round results arrive.
+- **The overlay.** Whether it is injected for a TFT match, where it lands on screen (`PANEL_BOUNDS` in
+  `main.js`), dragging, whether the position is saved when it is moved (`overlay.json` in the app's data
+  folder), and whether the hotkey clashes with anything in the game.
 
 ## Layout
 
 ```
-main.js        main process: window, Overwolf game events
+main.js        main process: window, in-game overlay, Overwolf game events, updates
 preload.cjs    bridge between the main process and the window
-coach.*        the window: views and rendering
+coach.*        the window: views and rendering; with ?overlay, the compact page shown inside the game
 src/           logic: session (game state), comps, econ, store (game data), remote (downloads)
 test/          Node tests; test/fixtures/set_data.json is a copy of tft-coach's data/set_data.json
 ```

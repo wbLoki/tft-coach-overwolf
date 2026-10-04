@@ -78,6 +78,18 @@ dialog li { margin-bottom: 6px; }
 dialog button { background: var(--raised); }
 dialog a { color: var(--info); }
 
+/* The in-game overlay: the same page, reduced to the live facts the game doesn't already show. */
+.overlay-only { display: none; }
+html:has(body.overlay) { background: transparent; }
+body.overlay { padding: 6px 8px; background: rgba(16, 26, 23, 0.9); font-size: 9.5pt; }
+body.overlay #nav,
+body.overlay #controls .right,
+body.overlay section:has(#board, #bench, #own-shop, #own-items, #matches) { display: none; }
+body.overlay .overlay-only { display: inline; margin-left: auto; }
+body.overlay .view { grid-template-columns: 1fr; }
+body.overlay .wide { grid-column: auto; }
+body.overlay #status { font-size: 11pt; cursor: move; -webkit-app-region: drag; }
+
 .bold { font-weight: 600; }
 .muted { color: var(--muted); }
 .label { display: inline-block; min-width: 86px; color: var(--info); }

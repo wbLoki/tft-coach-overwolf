@@ -30,6 +30,7 @@
   <main id="live" class="view" hidden>
     <form id="controls" class="wide">
       <label><input type="checkbox" name="lock"> keep following this comp</label>
+      <span class="overlay-only"><span class="hotkey"></span> hides this</span>
       <!-- Extra board slots beyond your level: Tactician's Cape / Crown, or augments that add team size. -->
       <label class="right">extra board slots
         <select name="extraSlots">
@@ -59,6 +60,8 @@
       <form id="prefs">
         <label><input type="checkbox" name="onTop"> Keep the window on top of other windows</label>
         <label><input type="checkbox" name="autoLive"> Open the Live game view when a match starts</label>
+        <label><input type="checkbox" name="overlay"> Show a compact overlay inside the game during a match</label>
+        <label>Show and hide the overlay with <button type="button" id="hotkey" class="hotkey"></button> <span class="muted">Click to change: Ctrl or Alt plus a key, or a function key.</span></label>
       </form>
     </section>
     <section class="wide">
@@ -82,10 +85,11 @@
     <ul>
       <li><b>Meta comps</b>: the comps doing best in recent high-rank games, with their units and items.</li>
       <li><b>Live game</b>: start a match and this view fills in with your gold, level and interest numbers,
-        the meta comp closest to your board, and the comps your opponents play.</li>
+        the meta comp closest to your board, and the comps your opponents play. A compact version also shows
+        inside the game: <span class="hotkey"></span> shows and hides it.</li>
       <li><b>Home</b>: a summary of your last game.</li>
     </ul>
-    <p>Put this window on a second monitor, or switch to it between rounds.</p>
+    <p>Put this window on a second monitor, or use the overlay inside the game.</p>
     <p id="consent" hidden>TFT Coach runs on Overwolf. Overwolf and its <a href="#" id="vendors">ad vendors</a> may store
       and read information on this device, such as a device identifier, to measure usage and to choose ads. TFT Coach
       shows no ads today. You can choose what you allow now, or later from Settings.

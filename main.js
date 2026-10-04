@@ -1,4 +1,4 @@
-/** Main process: opens the app window and forwards Overwolf's TFT game events to it. */
+/** Main process: opens the app window and the in-game overlay, and forwards Overwolf's TFT game events to them. */
 import { app, BrowserWindow, ipcMain, screen, shell } from "electron";
 import updater from "electron-updater";
 import fs from "node:fs";
@@ -12,6 +12,7 @@ const FEATURES = ["me", "match_info", "store", "board", "bench"];
 // kGepSupportedGameIds lists TFT on its own id; League of Legends, which TFT runs in, is accepted too.
 const GAME_IDS = [21570, 5426];
 const UPDATE_CHECK_MS = 4 * 60 * 60 * 1000;
+const PANEL_BOUNDS = { x: 20, y: 140, width: 380, height: 460 }; // the overlay, until the user moves or resizes it
 // Pages the window may open in the browser.
 const LINKS = {
   privacy: "https://github.com/wbLoki/tft-coach-overwolf/blob/main/PRIVACY.md",
@@ -19,14 +20,26 @@ const LINKS = {
 };
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const page = path.join(here, "coach.html");
+const listeners = new Set(); // pages that have loaded their data and asked for the game state
 let window = null;
-let listening = false; // the window has loaded its data and asked for the game state
 let gep = null;
+let overlay = null; // Overwolf's overlay package
+let panel = null; // the overlay window inside the game
+let launched = null; // the running game, as the overlay package reported it
+let overlayWanted = true; // the setting; the app window sends the saved value when it loads
+let live = false; // the app window is showing a TFT match
+let panelHidden = false; // hidden with the hotkey
+// Shows and hides the overlay. The app window sends the saved one when it loads; this is the same default as in coach.js.
+let hotkey = { keyCode: "KeyT", modifiers: { ctrl: true, shift: true } };
 let activeGame = null;
 let update = null; // what a restart would install: {version} for a new TFT Coach, {} for Overwolf's packages alone
 
 function send(channel, payload) {
-  if (listening && window) window.webContents.send(channel, payload);
+  for (const contents of listeners) {
+    if (contents.isDestroyed()) listeners.delete(contents);
+    else contents.send(channel, payload);
+  }
 }
 
 function createWindow() {
@@ -41,11 +54,87 @@ function createWindow() {
     webPreferences: { preload: path.join(here, "preload.cjs") },
   });
   window.removeMenu();
-  window.loadFile(path.join(here, "coach.html"));
+  window.loadFile(page);
   window.on("closed", () => {
     window = null;
-    listening = false;
+    panel?.window.close(); // or the app would keep running with only the overlay
   });
+}
+
+/** The overlay is on screen during a TFT match only: the same game process also runs League of Legends matches. */
+function showPanel() {
+  if (!panel) return;
+  if (overlayWanted && live && !panelHidden) panel.window.show();
+  else panel.window.hide();
+}
+
+const panelFile = () => path.join(app.getPath("userData"), "overlay.json");
+
+/** Where the user left the overlay, unless that spot is no longer on a screen. */
+function panelBounds() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(panelFile(), "utf8"));
+    const onScreen = screen.getAllDisplays().some(({ bounds }) => saved.x >= bounds.x && saved.x < bounds.x + bounds.width &&
+                                                                saved.y >= bounds.y && saved.y < bounds.y + bounds.height);
+    if (onScreen && saved.width > 0 && saved.height > 0) return saved;
+  } catch {
+    // nothing saved yet
+  }
+  return PANEL_BOUNDS;
+}
+
+function savePanelBounds() {
+  fs.writeFile(panelFile(), JSON.stringify(panel.window.getBounds()), (error) => error && console.error("overlay position:", error));
+}
+
+/** Hotkeys only exist while the overlay does. A key the package doesn't know is refused when it is registered. */
+function registerHotkey() {
+  if (!panel) return;
+  overlay.hotkeys.unregisterAll();
+  try {
+    overlay.hotkeys.register({ name: "toggle-overlay", ...hotkey }, (pressed, state) => {
+      if (state !== "pressed") return;
+      panelHidden = !panelHidden;
+      showPanel();
+    });
+  } catch (error) {
+    console.error("overlay hotkey:", error);
+  }
+}
+
+/** The same page as the app window, in its compact form, drawn inside the game. */
+async function createPanel() {
+  if (panel) return;
+  panel = await overlay.createWindow({
+    name: "tft-coach-overlay", ...panelBounds(), minWidth: 300, minHeight: 200,
+    show: false, frame: false, transparent: true, ignoreKeyboardInput: true, // the game keeps the keyboard
+    webPreferences: { preload: path.join(here, "preload.cjs") },
+  });
+  panel.window.loadFile(page, { query: { overlay: "1" } });
+  for (const change of ["moved", "resized", "close"]) panel.window.on(change, savePanelBounds);
+  panel.window.on("closed", () => {
+    panel = null;
+  });
+  registerHotkey();
+  showPanel();
+}
+
+function watchOverlay() {
+  overlay.removeAllListeners();
+  overlay.registerGames({ gamesIds: GAME_IDS });
+  overlay.on("game-launched", (event, gameInfo) => {
+    launched = gameInfo;
+    if (overlayWanted && gameInfo.supported) event.inject();
+    else event.dismiss();
+  });
+  overlay.on("game-injected", () => createPanel().catch((error) => console.error("overlay window:", error)));
+  overlay.on("game-injection-error", (gameInfo, error) => console.error("overlay injection:", error));
+  overlay.on("game-exit", () => {
+    launched = null;
+    overlay.hotkeys.unregisterAll();
+    panel?.window.close();
+  });
+  overlay.on("error", (...details) => console.error("overlay error:", ...details));
 }
 
 /** The state so far, for a window that finished loading after the game started. */
@@ -98,10 +187,24 @@ function watchUpdates() {
   setInterval(check, UPDATE_CHECK_MS);
 }
 
-ipcMain.on("ready", () => {
-  listening = true;
-  if (update) send("update", update);
+ipcMain.on("ready", (event) => {
+  listeners.add(event.sender);
+  if (update) event.sender.send("update", update);
   sendState();
+});
+ipcMain.on("live", (event, flag) => {
+  live = flag;
+  showPanel();
+});
+ipcMain.on("overlay", (event, flag) => {
+  overlayWanted = flag;
+  showPanel();
+  // Switched on during a game that was left alone: ask for it again, which fires "game-launched" once more.
+  if (flag && launched && !panel) overlay?.requestGameInjection(launched.classId).catch((error) => console.error("overlay:", error));
+});
+ipcMain.on("hotkey", (event, keys) => {
+  hotkey = keys;
+  registerHotkey();
 });
 ipcMain.on("restart", () => {
   if (update?.version) {
@@ -124,9 +227,13 @@ ipcMain.on("open", (event, name) => {
 ipcMain.on("on-top", (event, flag) => window?.setAlwaysOnTop(flag));
 ipcMain.handle("version", () => app.getVersion());
 app.overwolf.packages.on("ready", (event, name) => {
-  if (name !== "gep") return;
-  gep = app.overwolf.packages.gep;
-  watchGames();
+  if (name === "gep") {
+    gep = app.overwolf.packages.gep;
+    watchGames();
+  } else if (name === "overlay") {
+    overlay = app.overwolf.packages.overlay;
+    watchOverlay();
+  }
 });
 app.overwolf.packages.on("failed-to-initialize", (event, name) => {
   if (name === "gep") send("problem", "Overwolf's game events couldn't start, so the game can't be read.");

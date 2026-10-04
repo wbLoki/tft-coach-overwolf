@@ -5,12 +5,15 @@ import { Session } from "./src/session.js";
 import { data, setData } from "./src/store.js";
 
 const HOME_COMPS = 5;
+const overlay = new URLSearchParams(location.search).has("overlay"); // this page is the in-game overlay, not the app window
 // cell_1..cell_28 are drawn left to right, row by row. Overwolf doesn't document the numbering, so check it in a real game.
 const BOARD_ROWS = 4;
 const BOARD_COLUMNS = 7;
 const BENCH_SLOTS = 9;
 const LAST_GAME = "tft-coach:last-game";
 const PREFS = "tft-coach:prefs";
+// Keys the overlay hotkey can use, as KeyboardEvent.code: the ones Overwolf's overlay package accepts.
+const HOTKEY_KEYS = /^(Key[A-Z]|Digit\d|Numpad\d|F\d{1,2}|Arrow(Up|Down|Left|Right)|Tab|Space|Home|End|PageUp|PageDown|Delete|Backquote|Minus|Equal|BracketLeft|BracketRight|Semicolon|Quote|Comma|Period|Slash|Backslash)$/;
 
 setData(await loadData()); // before any event can ask for a view
 const session = new Session();
@@ -18,7 +21,10 @@ const controls = document.getElementById("controls");
 const prefsForm = document.getElementById("prefs");
 const welcome = document.getElementById("welcome");
 const updateButton = document.getElementById("update");
-const prefs = { onTop: true, autoLive: true, welcomed: false, ...JSON.parse(localStorage.getItem(PREFS) ?? "{}") };
+const hotkeyButton = document.getElementById("hotkey");
+const prefs = { onTop: true, autoLive: true, overlay: true, welcomed: false,
+                hotkey: { keyCode: "KeyT", modifiers: { ctrl: true, alt: false, shift: true } }, // the same default as in main.js
+                ...JSON.parse(localStorage.getItem(PREFS) ?? "{}") };
 let problem = ""; // why the game can't be read, if main.js reported one
 let live = false; // a game is being shown in the Live view
 let remembered = ""; // the last-game summary already saved
@@ -63,6 +69,14 @@ function show(name) {
 
 function savePrefs() {
   localStorage.setItem(PREFS, JSON.stringify(prefs));
+}
+
+/** The overlay hotkey as text, like "Ctrl+Shift+T", everywhere the page names it. */
+function renderHotkey() {
+  const { keyCode, modifiers } = prefs.hotkey;
+  const text = [modifiers.ctrl && "Ctrl", modifiers.alt && "Alt", modifiers.shift && "Shift", keyCode.replace(/^(Key|Digit)/, "")]
+    .filter(Boolean).join("+");
+  for (const element of document.querySelectorAll(".hotkey")) element.textContent = text;
 }
 
 function renderHome() {
@@ -121,6 +135,7 @@ function renderLive() {
   const view = data.set ? session.view(options())
     : { waiting: "The game data couldn't be downloaded. Check your connection, then reopen the app." };
   if (!live && !view.waiting && prefs.autoLive) show("live");
+  if (!overlay && live !== !view.waiting) window.game.setLive(!view.waiting); // main.js shows the overlay during a match
   live = !view.waiting;
   if (view.waiting) {
     fill("status", esc(view.waiting));
@@ -183,7 +198,7 @@ function remember() {
 
 function render() {
   renderLive();
-  remember();
+  if (!overlay) remember();
   renderHome();
   renderUpdate();
 }
@@ -219,11 +234,36 @@ controls.addEventListener("change", render);
 document.getElementById("nav").addEventListener("click", (event) => {
   if (event.target.dataset.view) show(event.target.dataset.view);
 });
-for (const name of ["onTop", "autoLive"]) prefsForm.elements[name].checked = prefs[name];
+for (const name of ["onTop", "autoLive", "overlay"]) prefsForm.elements[name].checked = prefs[name];
 prefsForm.addEventListener("change", () => {
-  for (const name of ["onTop", "autoLive"]) prefs[name] = prefsForm.elements[name].checked;
+  for (const name of ["onTop", "autoLive", "overlay"]) prefs[name] = prefsForm.elements[name].checked;
   savePrefs();
   window.game.setOnTop(prefs.onTop);
+  window.game.setOverlay(prefs.overlay);
+});
+hotkeyButton.addEventListener("click", () => {
+  hotkeyButton.disabled = true;
+  hotkeyButton.textContent = "Press the new keys (Esc cancels)";
+  const capture = (event) => {
+    event.preventDefault();
+    if (["Control", "Alt", "Shift", "Meta"].includes(event.key)) return; // still choosing: wait for the key itself
+    window.removeEventListener("keydown", capture, true);
+    // A plain key would be taken away from the game, so it needs Ctrl or Alt, unless it is a function key.
+    if (HOTKEY_KEYS.test(event.code) && (event.ctrlKey || event.altKey || /^F\d/.test(event.code))) {
+      prefs.hotkey = { keyCode: event.code, modifiers: { ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey } };
+      savePrefs();
+      window.game.setHotkey(prefs.hotkey);
+    }
+    hotkeyButton.disabled = false;
+    renderHotkey();
+  };
+  window.addEventListener("keydown", capture, true);
+});
+// The app window and the overlay share the saved settings: the overlay names the new hotkey as soon as it changes.
+window.addEventListener("storage", (event) => {
+  if (event.key !== PREFS) return;
+  Object.assign(prefs, JSON.parse(event.newValue ?? "{}"));
+  renderHotkey();
 });
 document.getElementById("show-welcome").addEventListener("click", () => welcome.showModal());
 document.getElementById("manage-privacy").addEventListener("click", () => window.game.privacySettings());
@@ -247,8 +287,16 @@ fill("about", esc(`TFT Coach ${await window.game.version()}\n\n` +
   "registered trademarks of Riot Games, Inc."));
 renderComps();
 render();
-window.game.setOnTop(prefs.onTop);
+if (overlay) {
+  document.body.classList.add("overlay");
+  show("live");
+} else {
+  window.game.setOnTop(prefs.onTop);
+  window.game.setOverlay(prefs.overlay);
+  window.game.setHotkey(prefs.hotkey);
+}
+renderHotkey();
 // Where the law asks for consent, the welcome guide also explains what Overwolf stores and how to choose.
 document.getElementById("consent").hidden = !(await window.game.consentNeeded());
-if (!prefs.welcomed) welcome.showModal();
+if (!overlay && !prefs.welcomed) welcome.showModal();
 window.game.ready();
